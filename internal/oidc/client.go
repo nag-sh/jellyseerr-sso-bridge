@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/nag-sh/jellyseerr-sso-bridge/internal/config"
@@ -106,17 +108,16 @@ func (c *Client) Exchange(ctx context.Context, code, state string) (*Claims, err
 	// Extract ID token
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		// Debug: log what we got
-		fmt.Printf("DEBUG: token.Extra keys: %+v\n", token)
-		return nil, fmt.Errorf("no id_token in response")
+		return nil, fmt.Errorf("no id_token in response, token type: %T", token.Extra("id_token"))
 	}
 	
-	// Debug: log first 100 chars of ID token
-	if len(rawIDToken) > 100 {
-		fmt.Printf("DEBUG: id_token (first 100 chars): %s...\n", rawIDToken[:100])
-	} else {
-		fmt.Printf("DEBUG: id_token: %s\n", rawIDToken)
+	// Debug: log ID token info
+	parts := strings.Split(rawIDToken, ".")
+	preview := rawIDToken
+	if len(preview) > 50 {
+		preview = preview[:50]
 	}
+	fmt.Fprintf(os.Stderr, "DEBUG: id_token has %d parts, length=%d, first50=%s\n", len(parts), len(rawIDToken), preview)
 
 	// Verify ID token
 	idToken, err := c.verifier.Verify(ctx, rawIDToken)
