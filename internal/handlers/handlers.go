@@ -83,8 +83,9 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		originalURL := getOriginalURL(r)
 		loginURL := h.buildLoginURL(originalURL)
 		
-		w.Header().Set("Location", loginURL)
-		w.WriteHeader(http.StatusUnauthorized)
+		// Return 302 redirect to login page
+		// Browsers follow 3xx redirects, not 401 with Location header
+		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}
 
