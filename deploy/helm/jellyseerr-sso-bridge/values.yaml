@@ -1,0 +1,114 @@
+# Default values for jellyseerr-sso-bridge
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/nag-sh/jellyseerr-sso-bridge
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Configuration
+config:
+  # OIDC Configuration
+  oidc:
+    issuer: ""           # Required: https://auth.example.com/application/o/jellyseerr-bridge/
+    clientId: ""         # Required: OIDC client ID
+    # clientSecret is loaded from existingSecret
+    
+  # Jellyfin Configuration  
+  jellyfin:
+    url: ""              # Required: http://jellyfin.servarr.svc:8096
+    # apiKey is loaded from existingSecret
+    
+  # Jellyseerr Configuration
+  jellyseerr:
+    url: ""              # Required: http://jellyseerr.servarr.svc:5055
+    # apiKey is loaded from existingSecret (optional, for admin features)
+    
+  # Bridge Configuration
+  bridge:
+    port: 8080
+    externalURL: ""      # Required: https://sso.example.com
+    cookieDomain: ""     # Required: .example.com
+    sessionTTL: "24h"
+
+# Secret configuration
+# The secret should contain:
+#   OIDC_CLIENT_SECRET: OIDC client secret
+#   JELLYFIN_API_KEY: Jellyfin admin API key
+#   JELLYSEERR_API_KEY: Jellyseerr API key (optional)
+#   SESSION_SECRET: Secret for signing session cookies
+existingSecret: ""
+
+# If not using existingSecret, you can provide values directly (not recommended for production)
+secrets:
+  oidcClientSecret: ""
+  jellyfinApiKey: ""
+  jellyseerrApiKey: ""
+  sessionSecret: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: "traefik"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: ""               # e.g., sso.example.com
+  tls:
+    enabled: true
+    secretName: ""       # Auto-generated if empty
+
+# Traefik forwardAuth middleware for Jellyseerr
+# This middleware will be created in the specified namespace
+# and should be referenced in Jellyseerr's ingress annotations
+forwardAuthMiddleware:
+  enabled: true
+  name: jellyseerr-sso-redirect
+  namespace: servarr     # Namespace where Jellyseerr runs
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 64Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Health check configuration
+healthCheck:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+

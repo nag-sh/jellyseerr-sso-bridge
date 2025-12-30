@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jellyseerr-sso-bridge.fullname" . }}
+  labels:
+    {{- include "jellyseerr-sso-bridge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "jellyseerr-sso-bridge.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "jellyseerr-sso-bridge.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "jellyseerr-sso-bridge.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.bridge.port }}
+              protocol: TCP
+          env:
+            # OIDC Configuration
+            - name: OIDC_ISSUER
+              value: {{ .Values.config.oidc.issuer | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.config.oidc.clientId | quote }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "jellyseerr-sso-bridge.secretName" . }}
+                  key: OIDC_CLIENT_SECRET
+            # Jellyfin Configuration
+            - name: JELLYFIN_URL
+              value: {{ .Values.config.jellyfin.url | quote }}
+            - name: JELLYFIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "jellyseerr-sso-bridge.secretName" . }}
+                  key: JELLYFIN_API_KEY
+            # Jellyseerr Configuration
+            - name: JELLYSEERR_URL
+              value: {{ .Values.config.jellyseerr.url | quote }}
+            - name: JELLYSEERR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "jellyseerr-sso-bridge.secretName" . }}
+                  key: JELLYSEERR_API_KEY
+                  optional: true
+            # Bridge Configuration
+            - name: BRIDGE_PORT
+              value: {{ .Values.config.bridge.port | quote }}
+            - name: BRIDGE_EXTERNAL_URL
+              value: {{ .Values.config.bridge.externalURL | quote }}
+            - name: BRIDGE_COOKIE_DOMAIN
+              value: {{ .Values.config.bridge.cookieDomain | quote }}
+            - name: SESSION_TTL
+              value: {{ .Values.config.bridge.sessionTTL | quote }}
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "jellyseerr-sso-bridge.secretName" . }}
+                  key: SESSION_SECRET
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthCheck.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.healthCheck.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthCheck.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.healthCheck.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

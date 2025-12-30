@@ -1,0 +1,18 @@
+apiVersion: v2
+name: jellyseerr-sso-bridge
+description: SSO bridge for Jellyseerr using Authentik OIDC with Jellyfin user linking
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - jellyseerr
+  - jellyfin
+  - sso
+  - oidc
+  - authentik
+home: https://github.com/nag-sh/jellyseerr-sso-bridge
+sources:
+  - https://github.com/nag-sh/jellyseerr-sso-bridge
+maintainers:
+  - name: nag-sh
+

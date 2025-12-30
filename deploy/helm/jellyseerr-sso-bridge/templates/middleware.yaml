@@ -1,0 +1,17 @@
+{{- if .Values.forwardAuthMiddleware.enabled -}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Values.forwardAuthMiddleware.name }}
+  namespace: {{ .Values.forwardAuthMiddleware.namespace }}
+  labels:
+    {{- include "jellyseerr-sso-bridge.labels" . | nindent 4 }}
+spec:
+  forwardAuth:
+    address: http://{{ include "jellyseerr-sso-bridge.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/auth/check
+    trustForwardHeader: true
+    authResponseHeaders:
+      - X-Forwarded-User
+      - X-Jellyfin-User-Id
+{{- end }}
+
