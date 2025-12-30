@@ -130,7 +130,14 @@ func (c *Client) Exchange(ctx context.Context, code, state string) (*Claims, err
 		return nil, fmt.Errorf("nonce mismatch")
 	}
 
-	// Extract claims
+	// Extract claims - first get raw claims to debug
+	var rawClaims map[string]interface{}
+	if err := idToken.Claims(&rawClaims); err != nil {
+		return nil, fmt.Errorf("failed to extract raw claims: %w", err)
+	}
+	slog.Info("DEBUG: raw claims from token", "claims", rawClaims)
+
+	// Now extract into our struct
 	var claims Claims
 	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("failed to extract claims: %w", err)
