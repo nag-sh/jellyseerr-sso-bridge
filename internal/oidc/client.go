@@ -106,7 +106,16 @@ func (c *Client) Exchange(ctx context.Context, code, state string) (*Claims, err
 	// Extract ID token
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
+		// Debug: log what we got
+		fmt.Printf("DEBUG: token.Extra keys: %+v\n", token)
 		return nil, fmt.Errorf("no id_token in response")
+	}
+	
+	// Debug: log first 100 chars of ID token
+	if len(rawIDToken) > 100 {
+		fmt.Printf("DEBUG: id_token (first 100 chars): %s...\n", rawIDToken[:100])
+	} else {
+		fmt.Printf("DEBUG: id_token: %s\n", rawIDToken)
 	}
 
 	// Verify ID token
