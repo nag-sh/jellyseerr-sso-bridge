@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
+	"log/slog"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -114,10 +114,10 @@ func (c *Client) Exchange(ctx context.Context, code, state string) (*Claims, err
 	// Debug: log ID token info
 	parts := strings.Split(rawIDToken, ".")
 	preview := rawIDToken
-	if len(preview) > 50 {
-		preview = preview[:50]
+	if len(preview) > 100 {
+		preview = preview[:100]
 	}
-	fmt.Fprintf(os.Stderr, "DEBUG: id_token has %d parts, length=%d, first50=%s\n", len(parts), len(rawIDToken), preview)
+	slog.Info("DEBUG: received id_token", "parts", len(parts), "length", len(rawIDToken), "preview", preview)
 
 	// Verify ID token
 	idToken, err := c.verifier.Verify(ctx, rawIDToken)
