@@ -74,7 +74,7 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 
 // Check handles forwardAuth check requests from Traefik
 func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
-	// Validate session
+	// Validate bridge session
 	sessionData, err := h.session.ValidateRequest(r)
 	if err != nil {
 		slog.Debug("session validation failed", "error", err)
@@ -84,12 +84,30 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		loginURL := h.buildLoginURL(originalURL)
 		
 		// Return 302 redirect to login page
-		// Browsers follow 3xx redirects, not 401 with Location header
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}
 
-	// Session is valid - set headers for downstream
+	// Also check if Jellyseerr session cookie exists
+	// If user logged out of Jellyseerr, we need to re-authenticate
+	_, err = r.Cookie("connect.sid")
+	if err != nil {
+		slog.Debug("jellyseerr session missing, re-authenticating", "user", sessionData.Username)
+		
+		// Clear the stale bridge session
+		clearCookie := h.session.ClearCookie(h.cookieDomain)
+		http.SetCookie(w, clearCookie)
+		
+		// Get the original URL from X-Forwarded headers
+		originalURL := getOriginalURL(r)
+		loginURL := h.buildLoginURL(originalURL)
+		
+		// Redirect to login page to get fresh sessions
+		http.Redirect(w, r, loginURL, http.StatusFound)
+		return
+	}
+
+	// Both sessions valid - set headers for downstream
 	w.Header().Set("X-Forwarded-User", sessionData.Username)
 	w.Header().Set("X-Jellyfin-User-Id", sessionData.JellyfinUserID)
 	w.WriteHeader(http.StatusOK)
@@ -258,9 +276,22 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles logout requests
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	// Clear the session cookie
+	// Clear the bridge session cookie
 	clearCookie := h.session.ClearCookie(h.cookieDomain)
 	http.SetCookie(w, clearCookie)
+	
+	// Also clear the Jellyseerr session cookie
+	jellyseerrClearCookie := &http.Cookie{
+		Name:     "connect.sid",
+		Value:    "",
+		Path:     "/",
+		Domain:   h.cookieDomain,
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(w, jellyseerrClearCookie)
 
 	// Redirect to the return URL or home
 	returnURL := r.URL.Query().Get("return_url")
