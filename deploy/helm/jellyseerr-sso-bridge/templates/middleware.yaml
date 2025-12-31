@@ -10,8 +10,12 @@ spec:
   forwardAuth:
     address: http://{{ include "jellyseerr-sso-bridge.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/auth/check
     trustForwardHeader: true
+    # Forward cookies so we can check both bridge and Jellyseerr sessions
+    authRequestHeaders:
+      - Cookie
     authResponseHeaders:
       - X-Forwarded-User
       - X-Jellyfin-User-Id
+      - Set-Cookie
 {{- end }}
 
