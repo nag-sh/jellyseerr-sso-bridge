@@ -165,9 +165,9 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		slog.Info("user not in jellyseerr, triggering import", 
 			"jellyfin_id", jellyfinUser.ID)
 		
-		// Trigger import of Jellyfin users
-		if err := h.jellyseerr.ImportJellyfinUsers(); err != nil {
-			slog.Error("failed to import jellyfin users", "error", err)
+		// Trigger import of specific Jellyfin user
+		if err := h.jellyseerr.ImportJellyfinUser(jellyfinUser.ID); err != nil {
+			slog.Error("failed to import jellyfin user", "error", err)
 		}
 
 		// Wait a moment for import to complete

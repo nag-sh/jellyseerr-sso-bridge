@@ -140,14 +140,24 @@ func (c *Client) GetUserByID(userID int) (*User, error) {
 	return &user, nil
 }
 
-// ImportJellyfinUsers triggers Jellyseerr to import users from Jellyfin
-func (c *Client) ImportJellyfinUsers() error {
-	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/user/import-from-jellyfin", nil)
+// ImportJellyfinUser triggers Jellyseerr to import a specific user from Jellyfin
+func (c *Client) ImportJellyfinUser(jellyfinUserID string) error {
+	// Jellyseerr expects an array of user IDs
+	reqBody := map[string]interface{}{
+		"jellyfinUserIds": []string{jellyfinUserID},
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/user/import-from-jellyfin", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	c.setHeaders(req)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
