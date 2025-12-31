@@ -181,35 +181,32 @@ type AuthResponse struct {
 	JellyfinAuthToken string `json:"jellyfinAuthToken,omitempty"`
 }
 
-// LoginAsUser creates a session for a specific user (admin API)
-// This uses the admin functionality to get auth tokens for a user
-func (c *Client) LoginAsUser(userID int) (*http.Cookie, error) {
-	// First, get the user's details
-	user, err := c.GetUserByID(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Use admin endpoint to create a session token
-	// Note: This requires admin API key and Jellyseerr >= 1.7
-	reqBody := map[string]interface{}{
-		"userId": user.ID,
+// LoginWithJellyfin authenticates a user using Jellyfin credentials and returns the session cookie
+func (c *Client) LoginWithJellyfin(username, password string) (*http.Cookie, error) {
+	reqBody := map[string]string{
+		"username": username,
+		"password": password,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 
-	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/auth/me", bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest("POST", c.baseURL+"/api/v1/auth/jellyfin", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	c.setHeaders(req)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("jellyseerr auth error: %d - %s", resp.StatusCode, string(body))
+	}
 
 	// Extract the session cookie from response
 	for _, cookie := range resp.Cookies() {

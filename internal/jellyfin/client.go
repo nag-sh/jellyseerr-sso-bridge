@@ -1,6 +1,7 @@
 package jellyfin
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,13 @@ import (
 	"time"
 
 	"github.com/nag-sh/jellyseerr-sso-bridge/internal/config"
+)
+
+const (
+	// DefaultAuthProvider is the standard password-based auth provider
+	DefaultAuthProvider = "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider"
+	// SSOAuthProvider is the SSO plugin auth provider
+	SSOAuthProvider = "Jellyfin.Plugin.SSO_Auth.Api.SSOController"
 )
 
 // Client handles Jellyfin API interactions
@@ -133,6 +141,74 @@ func (c *Client) Ping() error {
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("jellyfin returned status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// SetUserAuthProvider updates a user's authentication provider
+func (c *Client) SetUserAuthProvider(userID, authProvider string) error {
+	policy := map[string]string{
+		"AuthenticationProviderId": authProvider,
+		"PasswordResetProviderId":  "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider",
+	}
+	
+	body, err := json.Marshal(policy)
+	if err != nil {
+		return fmt.Errorf("failed to marshal policy: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/Users/"+userID+"/Policy", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Emby-Token", c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("jellyfin API error: %d - %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
+// SetUserPassword sets a user's password
+func (c *Client) SetUserPassword(userID, newPassword string) error {
+	pwData := map[string]string{
+		"CurrentPw": "",
+		"NewPw":     newPassword,
+	}
+	
+	body, err := json.Marshal(pwData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal password data: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/Users/"+userID+"/Password", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Emby-Token", c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("jellyfin API error: %d - %s", resp.StatusCode, string(respBody))
 	}
 
 	return nil

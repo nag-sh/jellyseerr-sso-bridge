@@ -187,15 +187,54 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		"jellyseerr_id", jellyseerrUser.ID,
 		"jellyfin_id", jellyseerrUser.JellyfinUserID)
 
-	// Create bridge session
+	// Create a Jellyseerr session by temporarily enabling password auth
+	// and using a temp password to login
+	tempPassword := fmt.Sprintf("sso-bridge-%d-%s", time.Now().UnixNano(), jellyfinUser.ID[:8])
+	
+	// Step 1: Enable default auth provider for the user
+	if err := h.jellyfin.SetUserAuthProvider(jellyfinUser.ID, jellyfin.DefaultAuthProvider); err != nil {
+		slog.Error("failed to set auth provider", "error", err)
+		http.Error(w, "Failed to configure authentication. Please try again.", 
+			http.StatusInternalServerError)
+		return
+	}
+	
+	// Step 2: Set a temporary password
+	if err := h.jellyfin.SetUserPassword(jellyfinUser.ID, tempPassword); err != nil {
+		slog.Error("failed to set temp password", "error", err)
+		http.Error(w, "Failed to configure authentication. Please try again.", 
+			http.StatusInternalServerError)
+		return
+	}
+	
+	// Step 3: Login to Jellyseerr with the temp password
+	jellyseerrCookie, err := h.jellyseerr.LoginWithJellyfin(claims.PreferredUsername, tempPassword)
+	if err != nil {
+		slog.Error("failed to login to jellyseerr", "error", err)
+		http.Error(w, "Failed to create Jellyseerr session. Please try again.", 
+			http.StatusInternalServerError)
+		return
+	}
+	
+	slog.Info("created jellyseerr session", "username", claims.PreferredUsername)
+
+	// Create bridge session (for forwardAuth validation)
 	sessionData := session.SessionData{
 		UserID:         jellyseerrUser.ID,
 		JellyfinUserID: jellyfinUser.ID,
 		Username:       claims.PreferredUsername,
 		Email:          claims.Email,
 	}
-	sessionCookie := h.session.Create(sessionData, h.cookieDomain)
-	http.SetCookie(w, sessionCookie)
+	bridgeSessionCookie := h.session.Create(sessionData, h.cookieDomain)
+	http.SetCookie(w, bridgeSessionCookie)
+	
+	// Set the Jellyseerr session cookie
+	// Adjust the cookie for the proper domain
+	jellyseerrCookie.Domain = h.cookieDomain
+	jellyseerrCookie.Path = "/"
+	jellyseerrCookie.Secure = true
+	jellyseerrCookie.SameSite = http.SameSiteLaxMode
+	http.SetCookie(w, jellyseerrCookie)
 
 	// Get return URL from state
 	stateData, err := oidc.DecodeState(state)
