@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -19,6 +20,7 @@ type Client struct {
 	provider    *oidc.Provider
 	oauth2Cfg   oauth2.Config
 	verifier    *oidc.IDTokenVerifier
+	issuer      string
 }
 
 // Claims represents the claims extracted from the ID token
@@ -58,6 +60,7 @@ func NewClient(ctx context.Context, cfg config.OIDCConfig) (*Client, error) {
 
 	return &Client{
 		provider:  provider,
+		issuer:    cfg.Issuer,
 		oauth2Cfg: oauth2Cfg,
 		verifier:  verifier,
 	}, nil
@@ -167,5 +170,16 @@ func generateNonce() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// GetEndSessionURL returns the URL to end the OIDC session at the provider
+func (c *Client) GetEndSessionURL(postLogoutRedirectURI string) string {
+	// Authentik's end_session_endpoint is at the issuer + /end-session/
+	// But we can construct it from the issuer URL
+	endSessionURL, _ := url.Parse(strings.TrimSuffix(c.issuer, "/") + "/end-session/")
+	q := endSessionURL.Query()
+	q.Set("post_logout_redirect_uri", postLogoutRedirectURI)
+	endSessionURL.RawQuery = q.Encode()
+	return endSessionURL.String()
 }
 

@@ -27,6 +27,7 @@ config:
   # Jellyseerr Configuration
   jellyseerr:
     url: ""              # Required: http://jellyseerr.servarr.svc:5055
+    host: ""             # Required: jellyseerr.example.com (for logout intercept)
     # apiKey is loaded from existingSecret (optional, for admin features)
     
   # Bridge Configuration

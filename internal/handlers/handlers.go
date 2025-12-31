@@ -276,6 +276,8 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles logout requests
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	slog.Info("user logging out")
+	
 	// Clear the bridge session cookie
 	clearCookie := h.session.ClearCookie(h.cookieDomain)
 	http.SetCookie(w, clearCookie)
@@ -293,13 +295,11 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, jellyseerrClearCookie)
 
-	// Redirect to the return URL or home
-	returnURL := r.URL.Query().Get("return_url")
-	if returnURL == "" {
-		returnURL = "/"
-	}
-
-	http.Redirect(w, r, returnURL, http.StatusFound)
+	// Build Authentik logout URL (OIDC end_session_endpoint)
+	// This will end the Authentik session and redirect to the home page
+	authentikLogoutURL := h.oidc.GetEndSessionURL("https://nag.sh")
+	
+	http.Redirect(w, r, authentikLogoutURL, http.StatusFound)
 }
 
 func (h *Handler) buildLoginURL(returnURL string) string {
