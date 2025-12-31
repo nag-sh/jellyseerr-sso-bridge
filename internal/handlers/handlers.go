@@ -299,7 +299,39 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	// This will end the Authentik session and redirect to the home page
 	authentikLogoutURL := h.oidc.GetEndSessionURL("https://nag.sh")
 	
+	// Check if this is an XHR/fetch request (Jellyseerr's frontend uses Axios)
+	// XHR requests can't handle cross-origin redirects, so return JSON with the URL
+	if isXHRRequest(r) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// Return the logout URL for the frontend to redirect to
+		w.Write([]byte(fmt.Sprintf(`{"status":"ok","logoutUrl":"%s"}`, authentikLogoutURL)))
+		return
+	}
+	
 	http.Redirect(w, r, authentikLogoutURL, http.StatusFound)
+}
+
+// isXHRRequest checks if the request is an XHR/fetch request
+func isXHRRequest(r *http.Request) bool {
+	// Check X-Requested-With header (jQuery/Axios)
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		return true
+	}
+	// Check Accept header for JSON (fetch/Axios typically accept JSON)
+	accept := r.Header.Get("Accept")
+	if accept != "" && (accept == "application/json" || 
+		len(accept) > 16 && accept[:16] == "application/json") {
+		return true
+	}
+	// Check Content-Type for form submissions from JS
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "application/x-www-form-urlencoded" && r.Method == "POST" {
+		// This is likely from Axios/fetch, not a browser form submission
+		// Browser form submissions don't set Accept: application/json
+		return true
+	}
+	return false
 }
 
 func (h *Handler) buildLoginURL(returnURL string) string {
