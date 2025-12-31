@@ -71,6 +71,7 @@ func main() {
 	mux.HandleFunc("GET /login", handler.Login)
 	mux.HandleFunc("GET /callback", handler.Callback)
 	mux.HandleFunc("GET /logout", handler.Logout)
+	mux.HandleFunc("POST /logout", handler.Logout)
 
 	// Create server
 	server := &http.Server{
